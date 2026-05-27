@@ -1,0 +1,10 @@
+name = "general"
+summary = "Free-form written-content generation with caller-supplied voice."
+sink = "workspace-files"
+voice = "configurable"
+graph_query = "off"
+type_noun = "piece"
+type_spec_file = "content-type-specs.md"
+content_types = ["essay", "newsletter", "doc", "thread", "marketing", "script"]
+references = ["voice-config.md", "content-type-specs.md"]
+triggers = "Generate written content in a caller-supplied voice and route finished drafts to workspace files. Produces essays, newsletters, documentation, social threads, marketing copy, and scripts, adapted per target platform."

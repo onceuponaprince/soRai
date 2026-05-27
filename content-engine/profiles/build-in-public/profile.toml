@@ -1,0 +1,10 @@
+name = "build-in-public"
+summary = "Build-in-public drafts in a fixed voice, staged for approval."
+sink = "borai-inbox"
+voice = "fixed:voice-profile.md"
+graph_query = "on"
+type_noun = "post"
+type_spec_file = "post-type-specs.md"
+content_types = ["metric", "lesson", "deep-dive", "bts", "hot-take", "recap", "launch", "failure"]
+references = ["voice-profile.md", "post-type-specs.md"]
+triggers = "Generate build-in-public content in the configured voice and stage drafts to the BorAI inbox for approval."

@@ -1,0 +1,14 @@
+{
+  "name": "content-engine",
+  "version": "0.1.0",
+  "description": "Profile-driven written-content engine. Core + profile overlays merged at render time.",
+  "profiles": ["general", "build-in-public"],
+  "core": [
+    "core/SKILL.template.md",
+    "core/pipeline.md",
+    "core/platform-formatting.md",
+    "core/references/quality-checklist.md",
+    "core/sinks/borai-inbox.md",
+    "core/sinks/workspace-files.md"
+  ]
+}
