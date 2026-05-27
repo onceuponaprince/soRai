@@ -8,8 +8,12 @@ requires-python = ">=3.11"
 sorai-content-engine-service = "content_engine_service.cli:main"
 
 [project.optional-dependencies]
+api = [
+  "django>=5.0,<6.0",
+]
 dev = [
   "pytest>=8",
+  "pytest-django>=4.8",
 ]
 
 [build-system]

@@ -2,17 +2,32 @@
 
 Service-library checkpoint for soRai.
 
-This package is intentionally API-free for now. It proves the core execution path:
+Current surfaces:
 
-1. discover profiles from `content-engine`
-2. render a profile bundle
-3. read `frontmatter.yaml`
-4. dispatch through an injectable runner
-5. validate boundary rules
-6. route output to a workspace artifact or approval event
+1. Core library pipeline (`render -> dispatch -> boundary -> sink -> store`)
+2. CLI for profiles/render/run/serve
+3. Local HTTP API (WSGI)
+4. Django backend scaffold that proxies `/api/v1/*` into the same core handler
 
 ## Test
 
 ```bash
 python3 -m pytest -q
+```
+
+## Run Local HTTP API
+
+```bash
+PYTHONPATH=src python3 -m content_engine_service.cli serve \
+  --engine-root ../content-engine \
+  --artifact-root /tmp/sorai-artifacts \
+  --store /tmp/sorai.sqlite3 \
+  --mock-output "mock output"
+```
+
+## Run Django Scaffold
+
+```bash
+cd backend
+python manage.py runserver 127.0.0.1:9000
 ```

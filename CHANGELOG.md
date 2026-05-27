@@ -2,6 +2,14 @@
 
 All notable soRai rebuild checkpoints are tracked here.
 
+## 0.11.0 - 2026-05-27
+
+- Added Django backend scaffold (`backend/`) with manage.py, settings, URLs, and WSGI/ASGI entrypoints.
+- Added Django proxy view that routes `/api/v1/*` requests into the shared core API handler for parity.
+- Added backend README with run instructions and environment expectations.
+- Added optional Django bridge tests (health/profile parity, run when Django is installed).
+- Added Django and pytest-django optional dependencies in `pyproject.toml`.
+
 ## 0.10.0 - 2026-05-27
 
 - Added `GET /api/v1/whoami` for role introspection on current actor context.
