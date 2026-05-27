@@ -2,6 +2,13 @@
 
 All notable soRai rebuild checkpoints are tracked here.
 
+## 0.7.0 - 2026-05-27
+
+- Added approval decision endpoints: `POST /api/v1/approvals/<event_id>/approve` and `/reject`.
+- Added decision metadata persistence (`decided_by`, `note`, `decided_at`) in SQLite approval events.
+- Added schema-upgrade guards for older SQLite files missing new decision columns.
+- Added approval lifecycle API tests for approve/reject, role checks, and repeat-decision protection.
+
 ## 0.6.0 - 2026-05-27
 
 - Added minimal HTTP API layer with `/health`, `/api/v1/profiles`, `/api/v1/runs`, and `/api/v1/approvals`.

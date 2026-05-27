@@ -81,3 +81,96 @@ def test_approvals_endpoint_returns_inbox_events(tmp_path):
     assert status2 == 200
     assert len(approvals_payload["approvals"]) == 1
     assert approvals_payload["approvals"][0]["inbox"] == "borai-inbox"
+
+
+
+def _create_pending_approval(cfg):
+    status, payload = handle_request(
+        config=cfg,
+        method="POST",
+        path="/api/v1/runs",
+        query={},
+        body={"profile": "build-in-public", "brief": "Write a note", "roles": ["approver"], "mode": "stage"},
+        headers={},
+    )
+    assert status == 201
+    assert payload["approval"] is not None
+    return payload["approval"]["event_id"]
+
+
+def test_approval_decision_approve_endpoint(tmp_path):
+    cfg = _config(tmp_path, mock_output="approval output")
+    event_id = _create_pending_approval(cfg)
+
+    status, payload = handle_request(
+        config=cfg,
+        method="POST",
+        path=f"/api/v1/approvals/{event_id}/approve",
+        query={},
+        body={"roles": ["approver"], "note": "looks good"},
+        headers={},
+    )
+    assert status == 200
+    assert payload["approval"]["approval_status"] == "approved"
+    assert payload["approval"]["note"] == "looks good"
+    assert payload["approval"]["decided_by"] == "approver"
+
+
+def test_approval_decision_reject_endpoint(tmp_path):
+    cfg = _config(tmp_path, mock_output="approval output")
+    event_id = _create_pending_approval(cfg)
+
+    status, payload = handle_request(
+        config=cfg,
+        method="POST",
+        path=f"/api/v1/approvals/{event_id}/reject",
+        query={},
+        body={"roles": ["admin"], "note": "needs revision"},
+        headers={},
+    )
+    assert status == 200
+    assert payload["approval"]["approval_status"] == "rejected"
+    assert payload["approval"]["note"] == "needs revision"
+    assert payload["approval"]["decided_by"] == "admin"
+
+
+def test_approval_decision_requires_approver_or_admin(tmp_path):
+    cfg = _config(tmp_path, mock_output="approval output")
+    event_id = _create_pending_approval(cfg)
+
+    status, payload = handle_request(
+        config=cfg,
+        method="POST",
+        path=f"/api/v1/approvals/{event_id}/approve",
+        query={},
+        body={"roles": ["operator"]},
+        headers={},
+    )
+    assert status == 403
+    assert "requires approver or admin" in payload["error"]
+
+
+def test_approval_decision_cannot_decide_twice(tmp_path):
+    cfg = _config(tmp_path, mock_output="approval output")
+    event_id = _create_pending_approval(cfg)
+
+    status, _ = handle_request(
+        config=cfg,
+        method="POST",
+        path=f"/api/v1/approvals/{event_id}/approve",
+        query={},
+        body={"roles": ["approver"]},
+        headers={},
+    )
+    assert status == 200
+
+    status2, payload2 = handle_request(
+        config=cfg,
+        method="POST",
+        path=f"/api/v1/approvals/{event_id}/reject",
+        query={},
+        body={"roles": ["approver"]},
+        headers={},
+    )
+    assert status2 == 400
+    assert "already approved" in payload2["error"]

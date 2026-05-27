@@ -56,10 +56,17 @@ class RunStore:
                   inbox text not null,
                   approval_status text not null,
                   payload_json text not null,
+                  decided_by text,
+                  note text,
+                  decided_at text,
                   created_at text not null default current_timestamp
                 );
                 """
             )
+            self._ensure_column(conn, "approval_events", "decided_by", "text")
+            self._ensure_column(conn, "approval_events", "note", "text")
+            self._ensure_column(conn, "approval_events", "decided_at", "text")
+
 
     def record_run(
         self,
@@ -129,6 +136,42 @@ class RunStore:
             row["payload"] = json.loads(row.pop("payload_json"))
         return rows
 
+    def get_approval_event(self, event_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "select * from approval_events where event_id = ?",
+                (event_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        data = dict(row)
+        data["payload"] = json.loads(data.pop("payload_json"))
+        return data
+
+    def decide_approval(self, *, event_id: str, decision: str, decided_by: str, note: str = "") -> dict[str, Any]:
+        if decision not in {"approved", "rejected"}:
+            raise ValueError(f"invalid decision: {decision}")
+        with self._connect() as conn:
+            row = conn.execute(
+                "select approval_status from approval_events where event_id = ?",
+                (event_id,),
+            ).fetchone()
+            if row is None:
+                raise KeyError(event_id)
+            if row["approval_status"] != "pending":
+                raise ValueError(f"approval event already {row['approval_status']}")
+            conn.execute(
+                """
+                update approval_events
+                set approval_status = ?, decided_by = ?, note = ?, decided_at = current_timestamp
+                where event_id = ?
+                """,
+                (decision, decided_by, note, event_id),
+            )
+        updated = self.get_approval_event(event_id)
+        assert updated is not None
+        return updated
+
     def _list_rows(self, table: str, run_id: str | None) -> list[dict[str, Any]]:
         if table not in {"artifacts", "approval_events"}:
             raise ValueError(f"unsupported table: {table}")
@@ -138,6 +181,11 @@ class RunStore:
             else:
                 rows = conn.execute(f"select * from {table} where run_id = ? order by created_at asc", (run_id,)).fetchall()
         return [dict(row) for row in rows]
+
+    def _ensure_column(self, conn: sqlite3.Connection, table: str, column: str, column_type: str) -> None:
+        columns = {row[1] for row in conn.execute(f"pragma table_info({table})")}
+        if column not in columns:
+            conn.execute(f"alter table {table} add column {column} {column_type}")
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.path)

@@ -135,6 +135,26 @@ def handle_request(*, config: ApiConfig, method: str, path: str, query: dict[str
                 "approval": _approval_view(approvals[0]) if approvals else None,
             }
 
+        if method == "POST" and path.startswith("/api/v1/approvals/"):
+            parts = [part for part in path.split("/") if part]
+            if len(parts) != 5:
+                return 404, {"error": "not found"}
+            event_id = parts[3]
+            action = parts[4]
+            if action not in {"approve", "reject"}:
+                return 404, {"error": "not found"}
+
+            actor = _actor_from_sources(query_roles=body.get("roles", []), header_roles=headers.get("x-actor-roles", ""))
+            if not ({"approver", "admin"} & set(actor.roles)):
+                return 403, {"error": "approval decision requires approver or admin role"}
+
+            store = _require_store(config)
+            decision = "approved" if action == "approve" else "rejected"
+            note = str(body.get("note", "")).strip()
+            decided_by = ",".join(actor.roles) or "approver"
+            updated = store.decide_approval(event_id=event_id, decision=decision, decided_by=decided_by, note=note)
+            return 200, {"approval": _approval_view(updated)}
+
         if method == "GET" and path == "/api/v1/approvals":
             store = _require_store(config)
             approvals = [_approval_view(row) for row in store.list_approval_events(None)]
@@ -150,6 +170,8 @@ def handle_request(*, config: ApiConfig, method: str, path: str, query: dict[str
         return 422, {"error": "boundary_rejected", "boundary": {"status": verdict.status.value, "detail": verdict.detail}}
     except LaneDispatchError as exc:
         return 502, {"error": str(exc)}
+    except KeyError as exc:
+        return 404, {"error": f"approval event not found: {exc.args[0]}"}
     except ValueError as exc:
         return 400, {"error": str(exc)}
 
@@ -190,6 +212,9 @@ def _approval_view(row: dict[str, Any]) -> dict[str, Any]:
         "inbox": row["inbox"],
         "approval_status": row["approval_status"],
         "payload": row.get("payload"),
+        "decided_by": row.get("decided_by"),
+        "note": row.get("note"),
+        "decided_at": row.get("decided_at"),
     }
 
 
