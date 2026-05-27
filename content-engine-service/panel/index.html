@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>soRai Panel Scaffold</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>soRai Panel</h1>
+      <div class="topbar-controls">
+        <label>
+          API Base
+          <input id="apiBase" value="http://127.0.0.1:8000" />
+        </label>
+        <label>
+          API Key
+          <input id="apiKey" placeholder="optional" />
+        </label>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="card" id="healthCard">
+        <h2>Health</h2>
+        <button id="healthBtn">Check Health</button>
+        <pre id="healthOut"></pre>
+      </section>
+
+      <section class="card">
+        <h2>Who Am I</h2>
+        <button id="whoamiBtn">Load Roles</button>
+        <pre id="whoamiOut"></pre>
+      </section>
+
+      <section class="card">
+        <h2>Profiles</h2>
+        <button id="profilesBtn">Load Profiles</button>
+        <pre id="profilesOut"></pre>
+      </section>
+
+      <section class="card">
+        <h2>Signup Request</h2>
+        <form id="signupForm">
+          <label>Email <input name="email" required /></label>
+          <label>Requested Roles (comma)
+            <input name="roles" value="operator" />
+          </label>
+          <button type="submit">Request Signup</button>
+        </form>
+        <pre id="signupOut"></pre>
+      </section>
+
+      <section class="card">
+        <h2>Pending Signups (Admin)</h2>
+        <button id="pendingBtn">Load Pending</button>
+        <div id="pendingList" class="list"></div>
+      </section>
+
+      <section class="card">
+        <h2>Create Run</h2>
+        <form id="runForm">
+          <label>Profile
+            <select name="profile">
+              <option value="general">general</option>
+              <option value="build-in-public">build-in-public</option>
+            </select>
+          </label>
+          <label>Mode
+            <select name="mode">
+              <option value="dry-run">dry-run</option>
+              <option value="stage">stage</option>
+            </select>
+          </label>
+          <label>Brief
+            <textarea name="brief" rows="4" required>Write a short update.</textarea>
+          </label>
+          <button type="submit">Run</button>
+        </form>
+        <pre id="runOut"></pre>
+      </section>
+
+      <section class="card">
+        <h2>Approvals</h2>
+        <button id="approvalsBtn">Load Approvals</button>
+        <div id="approvalsList" class="list"></div>
+      </section>
+
+      <section class="card">
+        <h2>Admin API Keys</h2>
+        <button id="keysBtn">Load Keys</button>
+        <div id="keysList" class="list"></div>
+      </section>
+    </main>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>

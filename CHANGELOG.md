@@ -2,6 +2,12 @@
 
 All notable soRai rebuild checkpoints are tracked here.
 
+## 0.12.0 - 2026-05-27
+
+- Added browser panel scaffold (`content-engine-service/panel/`) for direct operator/admin flow testing against local API endpoints.
+- Added panel runtime docs and static serve instructions for local mock-data validation.
+- Added front-facing scaffold contract tests for panel controls, route wiring, and local run instructions.
+
 ## 0.11.0 - 2026-05-27
 
 - Added Django backend scaffold (`backend/`) with manage.py, settings, URLs, and WSGI/ASGI entrypoints.
