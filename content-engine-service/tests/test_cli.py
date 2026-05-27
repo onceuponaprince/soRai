@@ -12,7 +12,7 @@ def test_cli_profiles(capsys):
 
     assert code == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["profiles"] == ["build-in-public", "general"]
+    assert payload["profiles"] == ["general"]
 
 
 def test_cli_render(capsys):
@@ -50,3 +50,28 @@ def test_cli_run_with_store(tmp_path, capsys):
     assert stored is not None
     assert stored.profile == "general"
     assert store.list_artifacts(payload["run_id"])
+
+
+
+def test_cli_profiles_filters_by_role(capsys):
+    code = main(["profiles", "--engine-root", str(ENGINE_ROOT), "--role", "operator"])
+
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["profiles"] == ["general"]
+
+
+def test_cli_run_denies_profile_for_operator(tmp_path, capsys):
+    code = main(["run", "--engine-root", str(ENGINE_ROOT), "--artifact-root", str(tmp_path), "--role", "operator", "--profile", "build-in-public", "--brief", "note", "--mock-output", "draft"])
+
+    assert code == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert "not allowed" in payload["error"]
+
+
+def test_cli_run_allows_profile_for_approver(tmp_path, capsys):
+    code = main(["run", "--engine-root", str(ENGINE_ROOT), "--artifact-root", str(tmp_path), "--role", "approver", "--profile", "build-in-public", "--brief", "note", "--mode", "stage", "--mock-output", "draft"])
+
+    assert code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["approval"]["inbox"] == "borai-inbox"

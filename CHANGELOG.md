@@ -2,6 +2,13 @@
 
 All notable soRai rebuild checkpoints are tracked here.
 
+## 0.5.0 - 2026-05-27
+
+- Added role-aware profile access policy for public, operator, approver, and admin scopes.
+- Added JSON allowlist loading for custom profile access rules.
+- Added CLI profile filtering and render/run access checks.
+- Added RBAC tests for default policy, custom allowlists, denial, and staged approval access.
+
 ## 0.4.0 - 2026-05-27
 
 - Added service lane adapter and CLI commands.
