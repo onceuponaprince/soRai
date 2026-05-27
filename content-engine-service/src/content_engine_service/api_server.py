@@ -62,6 +62,9 @@ def handle_request(*, config: ApiConfig, method: str, path: str, query: dict[str
         if method == "GET" and path == "/health":
             return 200, {"status": "ok"}
 
+        if method == "GET" and path == "/api/v1/whoami":
+            return 200, {"roles": list(actor.roles)}
+
         if method == "GET" and path == "/api/v1/profiles":
             names = profiles_registry.list_profile_names(config.engine_root)
             allowed = config.policy.allowed_profiles(actor, names)
@@ -119,6 +122,27 @@ def handle_request(*, config: ApiConfig, method: str, path: str, query: dict[str
 
             signup = store.reject_signup(signup_id=signup_id, decided_by=decided_by, note=note)
             return 200, {"signup": _signup_view(signup)}
+
+        if method == "GET" and path == "/api/v1/admin/api-keys":
+            if "admin" not in set(actor.roles):
+                return 403, {"error": "admin role required"}
+            store = _require_store(config)
+            keys = [_issued_key_view(row) for row in store.list_issued_api_keys()]
+            return 200, {"api_keys": keys}
+
+        if method == "POST" and path.startswith("/api/v1/admin/api-keys/"):
+            if "admin" not in set(actor.roles):
+                return 403, {"error": "admin role required"}
+            parts = [part for part in path.split("/") if part]
+            if len(parts) != 6:
+                return 404, {"error": "not found"}
+            api_key = parts[4]
+            action = parts[5]
+            if action not in {"revoke", "reactivate"}:
+                return 404, {"error": "not found"}
+            store = _require_store(config)
+            updated = store.set_api_key_active(api_key=api_key, is_active=(action == "reactivate"))
+            return 200, {"api_key": _issued_key_view(updated)}
 
         if method == "POST" and path == "/api/v1/runs":
             profile = str(body.get("profile", "")).strip()
@@ -285,6 +309,18 @@ def _run_payload(record) -> dict[str, Any]:
             "approval_status": record.sink_result.approval.approval_status,
         },
         "preview_excerpt": record.sink_result.preview_excerpt,
+    }
+
+
+def _issued_key_view(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "api_key": row["api_key"],
+        "signup_request_id": row["signup_request_id"],
+        "email": row["email"],
+        "signup_status": row.get("signup_status"),
+        "roles": list(row.get("roles", ())),
+        "is_active": bool(row.get("is_active")),
+        "created_at": row.get("created_at"),
     }
 
 

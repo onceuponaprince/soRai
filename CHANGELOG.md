@@ -2,6 +2,14 @@
 
 All notable soRai rebuild checkpoints are tracked here.
 
+## 0.10.0 - 2026-05-27
+
+- Added `GET /api/v1/whoami` for role introspection on current actor context.
+- Added admin API-key inventory endpoint: `GET /api/v1/admin/api-keys`.
+- Added admin key state endpoints: `POST /api/v1/admin/api-keys/<key>/revoke` and `/reactivate`.
+- Extended store with issued-key listing/detail helpers and active-state toggling.
+- Added tests for whoami, admin key management, and revoke/reactivate auth effects.
+
 ## 0.9.0 - 2026-05-27
 
 - Added pending-user signup flow with admin approval/rejection endpoints.

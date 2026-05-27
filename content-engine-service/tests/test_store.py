@@ -38,3 +38,24 @@ def test_store_signup_lifecycle_and_api_key_roles(tmp_path):
 
     roles = store.roles_for_api_key(api_key)
     assert roles == ("approver",)
+
+
+
+def test_store_issued_key_listing_and_toggle(tmp_path):
+    store = RunStore(tmp_path / "runs.sqlite3")
+    store.init_schema()
+
+    signup = store.request_signup(email="keys@example.com", requested_roles=("operator",))
+    approved = store.approve_signup(signup_id=signup["id"], approved_by="admin")
+    api_key = approved["api_key"]
+
+    keys = store.list_issued_api_keys()
+    assert len(keys) == 1
+    assert keys[0]["api_key"] == api_key
+    assert keys[0]["is_active"] is True
+
+    store.set_api_key_active(api_key=api_key, is_active=False)
+    assert store.roles_for_api_key(api_key) is None
+
+    store.set_api_key_active(api_key=api_key, is_active=True)
+    assert store.roles_for_api_key(api_key) is not None

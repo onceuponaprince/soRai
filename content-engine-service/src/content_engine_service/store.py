@@ -306,6 +306,60 @@ class RunStore:
         roles = json.loads(row["roles_json"])
         return tuple(sorted(str(role).strip().lower() for role in roles if str(role).strip()))
 
+    def get_issued_api_key(self, api_key: str) -> dict[str, Any] | None:
+        key = api_key.strip()
+        if not key:
+            return None
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                select k.api_key, k.signup_request_id, k.roles_json, k.is_active, k.created_at,
+                       s.email, s.status as signup_status
+                from issued_api_keys k
+                join signup_requests s on s.id = k.signup_request_id
+                where k.api_key = ?
+                """,
+                (key,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._issued_key_row(dict(row))
+
+    def list_issued_api_keys(self) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                select k.api_key, k.signup_request_id, k.roles_json, k.is_active, k.created_at,
+                       s.email, s.status as signup_status
+                from issued_api_keys k
+                join signup_requests s on s.id = k.signup_request_id
+                order by k.created_at desc
+                """
+            ).fetchall()
+        return [self._issued_key_row(dict(row)) for row in rows]
+
+    def set_api_key_active(self, *, api_key: str, is_active: bool) -> dict[str, Any]:
+        key = api_key.strip()
+        if not key:
+            raise ValueError("api key is required")
+        with self._connect() as conn:
+            row = conn.execute("select is_active from issued_api_keys where api_key = ?", (key,)).fetchone()
+            if row is None:
+                raise KeyError(key)
+            conn.execute(
+                "update issued_api_keys set is_active = ? where api_key = ?",
+                (1 if is_active else 0, key),
+            )
+        updated = self.get_issued_api_key(key)
+        assert updated is not None
+        return updated
+
+    def _issued_key_row(self, row: dict[str, Any]) -> dict[str, Any]:
+        roles = json.loads(row.pop("roles_json"))
+        row["roles"] = tuple(sorted(str(role).strip().lower() for role in roles if str(role).strip()))
+        row["is_active"] = bool(row.get("is_active"))
+        return row
+
     def _signup_row(self, row: dict[str, Any]) -> dict[str, Any]:
         row["requested_roles"] = tuple(json.loads(row.pop("requested_roles_json")))
         approved_json = row.pop("approved_roles_json")

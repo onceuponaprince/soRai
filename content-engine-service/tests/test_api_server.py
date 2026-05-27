@@ -308,3 +308,124 @@ def test_signup_duplicate_request_conflicts(tmp_path):
     )
     assert second_status == 409
     assert "already exists" in payload["error"]
+
+
+
+def test_whoami_endpoint(tmp_path):
+    cfg = _config(tmp_path)
+    status, payload = handle_request(
+        config=cfg,
+        method="GET",
+        path="/api/v1/whoami",
+        query={"role": ["approver"]},
+        body={},
+        headers={},
+    )
+    assert status == 200
+    assert payload["roles"] == ["approver"]
+
+
+def test_admin_api_key_inventory_and_revoke_reactivate(tmp_path):
+    from content_engine_service.api_auth import ApiKeyAuthenticator
+
+    cfg = _config(tmp_path, mock_output="ignored")
+    cfg = ApiConfig(
+        engine_root=cfg.engine_root,
+        artifact_root=cfg.artifact_root,
+        policy=cfg.policy,
+        store_path=cfg.store_path,
+        mock_output=cfg.mock_output,
+        authenticator=ApiKeyAuthenticator(key_roles={"admin-key": ("admin",)}),
+    )
+
+    status_signup, payload_signup = handle_request(
+        config=cfg,
+        method="POST",
+        path="/api/v1/signup",
+        query={},
+        body={"email": "ops@example.com", "requested_roles": ["operator"]},
+        headers={},
+    )
+    assert status_signup == 201
+    signup_id = payload_signup["signup"]["id"]
+
+    status_approve, payload_approve = handle_request(
+        config=cfg,
+        method="POST",
+        path=f"/api/v1/signup/{signup_id}/approve",
+        query={},
+        body={"roles": ["admin"], "approved_roles": ["operator"]},
+        headers={"x-api-key": "admin-key"},
+    )
+    assert status_approve == 200
+    issued_key = payload_approve["api_key"]
+
+    status_keys, payload_keys = handle_request(
+        config=cfg,
+        method="GET",
+        path="/api/v1/admin/api-keys",
+        query={},
+        body={"roles": ["admin"]},
+        headers={"x-api-key": "admin-key"},
+    )
+    assert status_keys == 200
+    assert len(payload_keys["api_keys"]) == 1
+    assert payload_keys["api_keys"][0]["api_key"] == issued_key
+    assert payload_keys["api_keys"][0]["is_active"] is True
+
+    status_revoke, payload_revoke = handle_request(
+        config=cfg,
+        method="POST",
+        path=f"/api/v1/admin/api-keys/{issued_key}/revoke",
+        query={},
+        body={"roles": ["admin"]},
+        headers={"x-api-key": "admin-key"},
+    )
+    assert status_revoke == 200
+    assert payload_revoke["api_key"]["is_active"] is False
+
+    status_run_blocked, payload_run_blocked = handle_request(
+        config=cfg,
+        method="POST",
+        path="/api/v1/runs",
+        query={},
+        body={"profile": "general", "brief": "test", "mode": "dry-run"},
+        headers={"x-api-key": issued_key},
+    )
+    assert status_run_blocked == 401
+
+    status_reactivate, payload_reactivate = handle_request(
+        config=cfg,
+        method="POST",
+        path=f"/api/v1/admin/api-keys/{issued_key}/reactivate",
+        query={},
+        body={"roles": ["admin"]},
+        headers={"x-api-key": "admin-key"},
+    )
+    assert status_reactivate == 200
+    assert payload_reactivate["api_key"]["is_active"] is True
+
+    status_run_ok, payload_run_ok = handle_request(
+        config=cfg,
+        method="POST",
+        path="/api/v1/runs",
+        query={},
+        body={"profile": "general", "brief": "test", "mode": "dry-run"},
+        headers={"x-api-key": issued_key},
+    )
+    assert status_run_ok == 201
+    assert payload_run_ok["profile"] == "general"
+
+
+def test_admin_api_key_inventory_requires_admin(tmp_path):
+    cfg = _config(tmp_path)
+    status, payload = handle_request(
+        config=cfg,
+        method="GET",
+        path="/api/v1/admin/api-keys",
+        query={},
+        body={"roles": ["operator"]},
+        headers={},
+    )
+    assert status == 403
+    assert "admin role required" in payload["error"]
