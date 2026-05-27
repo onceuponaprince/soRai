@@ -120,20 +120,23 @@ class RunStore:
             ).fetchall()
         return [StoredRun(**dict(row)) for row in rows]
 
-    def list_artifacts(self, run_id: str) -> list[dict[str, Any]]:
-        return self._list_by_run("artifacts", run_id)
+    def list_artifacts(self, run_id: str | None = None) -> list[dict[str, Any]]:
+        return self._list_rows("artifacts", run_id)
 
-    def list_approval_events(self, run_id: str) -> list[dict[str, Any]]:
-        rows = self._list_by_run("approval_events", run_id)
+    def list_approval_events(self, run_id: str | None = None) -> list[dict[str, Any]]:
+        rows = self._list_rows("approval_events", run_id)
         for row in rows:
             row["payload"] = json.loads(row.pop("payload_json"))
         return rows
 
-    def _list_by_run(self, table: str, run_id: str) -> list[dict[str, Any]]:
+    def _list_rows(self, table: str, run_id: str | None) -> list[dict[str, Any]]:
         if table not in {"artifacts", "approval_events"}:
             raise ValueError(f"unsupported table: {table}")
         with self._connect() as conn:
-            rows = conn.execute(f"select * from {table} where run_id = ? order by created_at asc", (run_id,)).fetchall()
+            if run_id is None:
+                rows = conn.execute(f"select * from {table} order by created_at desc").fetchall()
+            else:
+                rows = conn.execute(f"select * from {table} where run_id = ? order by created_at asc", (run_id,)).fetchall()
         return [dict(row) for row in rows]
 
     def _connect(self) -> sqlite3.Connection:

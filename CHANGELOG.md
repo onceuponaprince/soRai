@@ -2,6 +2,13 @@
 
 All notable soRai rebuild checkpoints are tracked here.
 
+## 0.6.0 - 2026-05-27
+
+- Added minimal HTTP API layer with `/health`, `/api/v1/profiles`, `/api/v1/runs`, and `/api/v1/approvals`.
+- Added CLI `serve` command to run the local WSGI API service.
+- Added store read helpers to list artifacts and approval events globally or per run.
+- Added API tests covering role-filtered profiles, staged runs, access denial, and approval listing.
+
 ## 0.5.0 - 2026-05-27
 
 - Added role-aware profile access policy for public, operator, approver, and admin scopes.

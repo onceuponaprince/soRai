@@ -11,6 +11,7 @@ from content_engine_service.lane_adapter import LaneDispatchError, LaneRequest, 
 from content_engine_service.run_pipeline import UnknownProfile, execute_pipeline
 from content_engine_service.run_types import DispatchResult, RunMode
 from content_engine_service.store import RunStore
+from content_engine_service.api_server import ApiConfig, serve
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -43,6 +44,19 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("--role", action="append", default=[], help="Actor role used for profile access checks. Repeatable.")
     run_parser.add_argument("--allowlists", default="", help="Optional JSON allowlist policy path.")
 
+    serve_parser = subparsers.add_parser("serve", help="Run HTTP API server")
+    serve_parser.add_argument("--engine-root", default=_default_engine_root())
+    serve_parser.add_argument("--artifact-root", default="artifacts")
+    serve_parser.add_argument("--store", default="")
+    serve_parser.add_argument("--allowlists", default="")
+    serve_parser.add_argument("--runner", default="")
+    serve_parser.add_argument("--lane", default="api")
+    serve_parser.add_argument("--tool", default="router-qwen3.6")
+    serve_parser.add_argument("--timeout", type=int, default=180)
+    serve_parser.add_argument("--mock-output", default="")
+    serve_parser.add_argument("--host", default="127.0.0.1")
+    serve_parser.add_argument("--port", type=int, default=8000)
+
     args = parser.parse_args(argv)
 
     try:
@@ -58,6 +72,22 @@ def main(argv: list[str] | None = None) -> int:
             _load_policy(args.allowlists).assert_can_access(Actor.from_roles(args.role), args.profile, names)
             bundle = profiles_registry.render_bundle(Path(args.engine_root), args.profile, cache={})
             print(json.dumps({"profile": bundle.profile.name, "summary": bundle.profile.summary, "sink": bundle.profile.sink, "rendered_files": list(bundle.rendered_files)}, indent=2))
+            return 0
+
+        if args.command == "serve":
+            policy = _load_policy(args.allowlists)
+            config = ApiConfig(
+                engine_root=Path(args.engine_root),
+                artifact_root=Path(args.artifact_root),
+                policy=policy,
+                store_path=Path(args.store) if args.store else None,
+                runner=Path(args.runner) if args.runner else None,
+                default_lane=args.lane,
+                default_tool=args.tool,
+                timeout=args.timeout,
+                mock_output=args.mock_output,
+            )
+            serve(config=config, host=args.host, port=args.port)
             return 0
 
         if args.command == "run":
