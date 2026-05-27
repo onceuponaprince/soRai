@@ -16,6 +16,18 @@ Current surfaces:
 python3 -m pytest -q
 ```
 
+## Front-Facing Panel Tests
+
+```bash
+python3 -m pytest -q tests/test_panel_interactions.py
+```
+
+If browsers are not installed yet:
+
+```bash
+python3 -m playwright install chromium
+```
+
 ## Run Local HTTP API
 
 ```bash

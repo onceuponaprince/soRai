@@ -10,14 +10,25 @@ function headers(extra = {}) {
 
 async function request(path, opts = {}) {
   const base = apiBaseEl.value.trim().replace(/\/$/, "");
-  const response = await fetch(`${base}${path}`, opts);
-  let payload = {};
   try {
-    payload = await response.json();
-  } catch {
-    payload = { error: "non-json response" };
+    const response = await fetch(`${base}${path}`, opts);
+    let payload = {};
+    try {
+      payload = await response.json();
+    } catch {
+      payload = { error: "non-json response" };
+    }
+    return { ok: response.ok, status: response.status, payload };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      payload: {
+        error: String(error),
+        hint: "request failed: check API Base and CORS settings",
+      },
+    };
   }
-  return { ok: response.ok, status: response.status, payload };
 }
 
 function setPre(id, value) {

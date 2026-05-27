@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 
 from content_engine_service.access_policy import AccessPolicy
-from content_engine_service.api_server import ApiConfig, handle_request
+from content_engine_service.api_server import ApiConfig, create_wsgi_app, handle_request
 
 
 ENGINE_ROOT = Path(__file__).resolve().parents[2] / "content-engine"
@@ -429,3 +430,41 @@ def test_admin_api_key_inventory_requires_admin(tmp_path):
     )
     assert status == 403
     assert "admin role required" in payload["error"]
+
+
+def _call_wsgi(app, *, method: str, path: str) -> tuple[str, dict[str, str], bytes]:
+    status_line = ""
+    response_headers: dict[str, str] = {}
+
+    def _start_response(status, headers):
+        nonlocal status_line
+        status_line = status
+        response_headers.update({k: v for k, v in headers})
+
+    environ = {
+        "REQUEST_METHOD": method,
+        "PATH_INFO": path,
+        "QUERY_STRING": "",
+        "CONTENT_LENGTH": "0",
+        "wsgi.input": BytesIO(b""),
+    }
+    body = b"".join(app(environ, _start_response))
+    return status_line, response_headers, body
+
+
+def test_wsgi_app_includes_cors_headers(tmp_path):
+    app = create_wsgi_app(_config(tmp_path))
+    status, headers, _ = _call_wsgi(app, method="GET", path="/health")
+    assert status.startswith("200")
+    assert headers["Access-Control-Allow-Origin"] == "*"
+    assert "OPTIONS" in headers["Access-Control-Allow-Methods"]
+    assert "x-api-key" in headers["Access-Control-Allow-Headers"]
+
+
+def test_wsgi_app_handles_options_preflight(tmp_path):
+    app = create_wsgi_app(_config(tmp_path))
+    status, headers, body = _call_wsgi(app, method="OPTIONS", path="/api/v1/runs")
+    assert status.startswith("204")
+    assert headers["Content-Length"] == "0"
+    assert headers["Access-Control-Allow-Origin"] == "*"
+    assert body == b""

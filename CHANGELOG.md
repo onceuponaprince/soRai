@@ -2,6 +2,12 @@
 
 All notable soRai rebuild checkpoints are tracked here.
 
+## 0.13.0 - 2026-05-27
+
+- Added CORS and `OPTIONS` preflight support to the local WSGI API so the panel can call API endpoints from a different local port.
+- Hardened panel request handling to surface network/CORS failures in UI output instead of failing silently.
+- Added API CORS tests and Playwright-driven panel interaction tests that click core operator/admin controls end-to-end against mock API responses.
+
 ## 0.12.0 - 2026-05-27
 
 - Added browser panel scaffold (`content-engine-service/panel/`) for direct operator/admin flow testing against local API endpoints.

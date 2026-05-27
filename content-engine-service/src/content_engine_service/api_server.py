@@ -36,6 +36,14 @@ def create_wsgi_app(config: ApiConfig):
     def app(environ, start_response):
         method = environ.get("REQUEST_METHOD", "GET").upper()
         path = environ.get("PATH_INFO", "")
+
+        if method == "OPTIONS":
+            start_response("204 No Content", [
+                ("Content-Length", "0"),
+                *_cors_headers(),
+            ])
+            return [b""]
+
         query = parse_qs(environ.get("QUERY_STRING", ""), keep_blank_values=False)
         body = _read_json_body(environ)
         headers = _headers(environ)
@@ -43,7 +51,11 @@ def create_wsgi_app(config: ApiConfig):
         status, payload = handle_request(config=config, method=method, path=path, query=query, body=body, headers=headers)
         status_line = f"{status} {_reason_phrase(status)}"
         raw = json.dumps(payload).encode("utf-8")
-        start_response(status_line, [("Content-Type", "application/json"), ("Content-Length", str(len(raw)))])
+        start_response(status_line, [
+            ("Content-Type", "application/json"),
+            ("Content-Length", str(len(raw))),
+            *_cors_headers(),
+        ])
         return [raw]
 
     return app
@@ -391,3 +403,11 @@ def _require_store(config: ApiConfig) -> RunStore:
 def _reason_phrase(status: int) -> str:
     phrases = {200: "OK", 201: "Created", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 409: "Conflict", 422: "Unprocessable Entity", 502: "Bad Gateway"}
     return phrases.get(status, "OK")
+
+
+def _cors_headers() -> list[tuple[str, str]]:
+    return [
+        ("Access-Control-Allow-Origin", "*"),
+        ("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,OPTIONS"),
+        ("Access-Control-Allow-Headers", "Content-Type,x-api-key,x-actor-roles"),
+    ]
