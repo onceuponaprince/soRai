@@ -2,6 +2,22 @@
 
 All notable soRai rebuild checkpoints are tracked here.
 
+## 0.9.0 - 2026-05-27
+
+- Added pending-user signup flow with admin approval/rejection endpoints.
+- Added persisted signup requests and lifecycle states (`pending`, `approved`, `rejected`).
+- Added API-key issuance on signup approval and store-backed API-key role lookup.
+- Added API auth fallback to store-issued keys when static key map auth is enabled.
+- Added end-to-end tests for signup requests, admin approvals, conflict handling, and issued-key access.
+
+## 0.8.0 - 2026-05-27
+
+- Added optional API-key authentication for HTTP endpoints under `/api/v1/*`.
+- Added `x-api-key` role binding via JSON key map (`{api_key: [roles...]}`).
+- Added CLI `serve --api-keys <file.json>` support for enabling API-key auth.
+- Enforced authenticated role derivation when API-key auth is enabled, ignoring request-body role overrides.
+- Added auth unit tests and API integration tests for missing/invalid keys and role derivation.
+
 ## 0.7.0 - 2026-05-27
 
 - Added approval decision endpoints: `POST /api/v1/approvals/<event_id>/approve` and `/reject`.

@@ -10,6 +10,7 @@ from wsgiref.simple_server import make_server
 
 from content_engine_service import profiles_registry
 from content_engine_service.access_policy import Actor, AccessPolicy, ProfileAccessDenied
+from content_engine_service.api_auth import ApiAuthError, ApiKeyAuthenticator
 from content_engine_service.boundary_validator import BoundaryRejected
 from content_engine_service.lane_adapter import LaneDispatchError, LaneRequest, dispatch as lane_dispatch
 from content_engine_service.run_pipeline import UnknownProfile, execute_pipeline
@@ -28,6 +29,7 @@ class ApiConfig:
     default_tool: str = "router-qwen3.6"
     timeout: int = 180
     mock_output: str = ""
+    authenticator: ApiKeyAuthenticator | None = None
 
 
 def create_wsgi_app(config: ApiConfig):
@@ -55,14 +57,68 @@ def serve(config: ApiConfig, host: str = "127.0.0.1", port: int = 8000) -> None:
 
 def handle_request(*, config: ApiConfig, method: str, path: str, query: dict[str, list[str]], body: dict[str, Any], headers: dict[str, str]) -> tuple[int, dict[str, Any]]:
     try:
+        actor = _resolve_actor(config=config, path=path, query=query, body=body, headers=headers)
+
         if method == "GET" and path == "/health":
             return 200, {"status": "ok"}
 
         if method == "GET" and path == "/api/v1/profiles":
-            actor = _actor_from_sources(query_roles=query.get("role", []), header_roles=headers.get("x-actor-roles", ""))
             names = profiles_registry.list_profile_names(config.engine_root)
             allowed = config.policy.allowed_profiles(actor, names)
             return 200, {"profiles": list(allowed), "roles": list(actor.roles)}
+
+        if method == "POST" and path == "/api/v1/signup":
+            store = _require_store(config)
+            email = str(body.get("email", "")).strip()
+            requested_roles = body.get("requested_roles", ["operator"])
+            if not isinstance(requested_roles, list):
+                return 400, {"error": "requested_roles must be a list"}
+            signup = store.request_signup(
+                email=email,
+                requested_roles=tuple(str(role) for role in requested_roles),
+            )
+            return 201, {"signup": _signup_view(signup)}
+
+        if method == "GET" and path == "/api/v1/signup/pending":
+            if "admin" not in set(actor.roles):
+                return 403, {"error": "pending signup review requires admin role"}
+            store = _require_store(config)
+            pending = [_signup_view(row) for row in store.list_signup_requests("pending")]
+            return 200, {"pending": pending}
+
+        if method == "POST" and path.startswith("/api/v1/signup/"):
+            parts = [part for part in path.split("/") if part]
+            if len(parts) != 5:
+                return 404, {"error": "not found"}
+            if "admin" not in set(actor.roles):
+                return 403, {"error": "signup decisions require admin role"}
+
+            try:
+                signup_id = int(parts[3])
+            except ValueError:
+                return 400, {"error": "invalid signup id"}
+            action = parts[4]
+            if action not in {"approve", "reject"}:
+                return 404, {"error": "not found"}
+
+            store = _require_store(config)
+            note = str(body.get("note", "")).strip()
+            decided_by = ",".join(actor.roles) or "admin"
+
+            if action == "approve":
+                approved_roles = body.get("approved_roles", None)
+                if approved_roles is not None and not isinstance(approved_roles, list):
+                    return 400, {"error": "approved_roles must be a list"}
+                signup = store.approve_signup(
+                    signup_id=signup_id,
+                    approved_by=decided_by,
+                    approved_roles=tuple(str(role) for role in approved_roles) if approved_roles is not None else None,
+                    note=note,
+                )
+                return 200, {"signup": _signup_view(signup), "api_key": signup["api_key"]}
+
+            signup = store.reject_signup(signup_id=signup_id, decided_by=decided_by, note=note)
+            return 200, {"signup": _signup_view(signup)}
 
         if method == "POST" and path == "/api/v1/runs":
             profile = str(body.get("profile", "")).strip()
@@ -72,7 +128,6 @@ def handle_request(*, config: ApiConfig, method: str, path: str, query: dict[str
             if not brief:
                 return 400, {"error": "brief is required"}
 
-            actor = _actor_from_sources(query_roles=body.get("roles", []), header_roles=headers.get("x-actor-roles", ""))
             names = profiles_registry.list_profile_names(config.engine_root)
             config.policy.assert_can_access(actor, profile, names)
 
@@ -144,7 +199,6 @@ def handle_request(*, config: ApiConfig, method: str, path: str, query: dict[str
             if action not in {"approve", "reject"}:
                 return 404, {"error": "not found"}
 
-            actor = _actor_from_sources(query_roles=body.get("roles", []), header_roles=headers.get("x-actor-roles", ""))
             if not ({"approver", "admin"} & set(actor.roles)):
                 return 403, {"error": "approval decision requires approver or admin role"}
 
@@ -161,6 +215,8 @@ def handle_request(*, config: ApiConfig, method: str, path: str, query: dict[str
             return 200, {"approvals": approvals}
 
         return 404, {"error": "not found"}
+    except ApiAuthError as exc:
+        return 401, {"error": str(exc)}
     except ProfileAccessDenied as exc:
         return 403, {"error": str(exc)}
     except UnknownProfile as exc:
@@ -173,7 +229,34 @@ def handle_request(*, config: ApiConfig, method: str, path: str, query: dict[str
     except KeyError as exc:
         return 404, {"error": f"approval event not found: {exc.args[0]}"}
     except ValueError as exc:
-        return 400, {"error": str(exc)}
+        message = str(exc)
+        if "already exists" in message or "already approved" in message or "already rejected" in message:
+            return 409, {"error": message}
+        return 400, {"error": message}
+
+
+def _resolve_actor(*, config: ApiConfig, path: str, query: dict[str, list[str]], body: dict[str, Any], headers: dict[str, str]) -> Actor:
+    if not path.startswith("/api/v1/"):
+        return Actor.from_roles([])
+
+    if path == "/api/v1/signup":
+        return Actor.from_roles([])
+
+    if config.authenticator is not None:
+        try:
+            return config.authenticator.authenticate(headers)
+        except ApiAuthError as exc:
+            api_key = (headers.get("x-api-key") or "").strip()
+            if api_key and config.store_path is not None:
+                store = _require_store(config)
+                roles = store.roles_for_api_key(api_key)
+                if roles:
+                    return Actor.from_roles(roles)
+            raise exc
+
+    if isinstance(body.get("roles"), list):
+        return _actor_from_sources(query_roles=body.get("roles", []), header_roles=headers.get("x-actor-roles", ""))
+    return _actor_from_sources(query_roles=query.get("role", []), header_roles=headers.get("x-actor-roles", ""))
 
 
 def _actor_from_sources(*, query_roles: Any, header_roles: str) -> Actor:
@@ -203,6 +286,23 @@ def _run_payload(record) -> dict[str, Any]:
         },
         "preview_excerpt": record.sink_result.preview_excerpt,
     }
+
+
+def _signup_view(row: dict[str, Any]) -> dict[str, Any]:
+    data = {
+        "id": row["id"],
+        "email": row["email"],
+        "requested_roles": list(row.get("requested_roles", ())),
+        "status": row["status"],
+        "approved_roles": list(row.get("approved_roles", ())),
+        "note": row.get("note"),
+        "decided_by": row.get("decided_by"),
+        "decided_at": row.get("decided_at"),
+        "created_at": row.get("created_at"),
+    }
+    if "api_key" in row:
+        data["api_key"] = row["api_key"]
+    return data
 
 
 def _approval_view(row: dict[str, Any]) -> dict[str, Any]:
@@ -253,5 +353,5 @@ def _require_store(config: ApiConfig) -> RunStore:
 
 
 def _reason_phrase(status: int) -> str:
-    phrases = {200: "OK", 201: "Created", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 422: "Unprocessable Entity", 502: "Bad Gateway"}
+    phrases = {200: "OK", 201: "Created", 400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found", 409: "Conflict", 422: "Unprocessable Entity", 502: "Bad Gateway"}
     return phrases.get(status, "OK")

@@ -172,5 +172,139 @@ def test_approval_decision_cannot_decide_twice(tmp_path):
         body={"roles": ["approver"]},
         headers={},
     )
-    assert status2 == 400
+    assert status2 == 409
     assert "already approved" in payload2["error"]
+
+
+
+def test_api_key_auth_enforces_header(tmp_path):
+    from content_engine_service.api_auth import ApiKeyAuthenticator
+
+    cfg = _config(tmp_path)
+    cfg = ApiConfig(
+        engine_root=cfg.engine_root,
+        artifact_root=cfg.artifact_root,
+        policy=cfg.policy,
+        store_path=cfg.store_path,
+        mock_output=cfg.mock_output,
+        authenticator=ApiKeyAuthenticator(key_roles={"test-key": ("approver",)}),
+    )
+
+    status, payload = handle_request(config=cfg, method="GET", path="/api/v1/profiles", query={}, body={}, headers={})
+    assert status == 401
+    assert "x-api-key" in payload["error"]
+
+
+def test_api_key_auth_uses_roles_from_key(tmp_path):
+    from content_engine_service.api_auth import ApiKeyAuthenticator
+
+    cfg = _config(tmp_path, mock_output="approval output")
+    cfg = ApiConfig(
+        engine_root=cfg.engine_root,
+        artifact_root=cfg.artifact_root,
+        policy=cfg.policy,
+        store_path=cfg.store_path,
+        mock_output=cfg.mock_output,
+        authenticator=ApiKeyAuthenticator(key_roles={"approver-key": ("approver",)}),
+    )
+
+    status, payload = handle_request(
+        config=cfg,
+        method="POST",
+        path="/api/v1/runs",
+        query={},
+        body={"profile": "build-in-public", "brief": "Write a note", "mode": "stage", "roles": ["operator"]},
+        headers={"x-api-key": "approver-key"},
+    )
+    assert status == 201
+    assert payload["approval"]["inbox"] == "borai-inbox"
+
+
+
+def test_signup_request_and_admin_approval_lifecycle(tmp_path):
+    cfg = _config(tmp_path, mock_output="ignored")
+
+    status, payload = handle_request(
+        config=cfg,
+        method="POST",
+        path="/api/v1/signup",
+        query={},
+        body={"email": "newuser@example.com", "requested_roles": ["operator"]},
+        headers={},
+    )
+    assert status == 201
+    signup_id = payload["signup"]["id"]
+    assert payload["signup"]["status"] == "pending"
+
+    status2, payload2 = handle_request(
+        config=cfg,
+        method="GET",
+        path="/api/v1/signup/pending",
+        query={},
+        body={"roles": ["admin"]},
+        headers={},
+    )
+    assert status2 == 200
+    assert len(payload2["pending"]) == 1
+
+    status3, payload3 = handle_request(
+        config=cfg,
+        method="POST",
+        path=f"/api/v1/signup/{signup_id}/approve",
+        query={},
+        body={"roles": ["admin"], "approved_roles": ["operator"], "note": "approved"},
+        headers={},
+    )
+    assert status3 == 200
+    assert payload3["signup"]["status"] == "approved"
+    issued_key = payload3["api_key"]
+    assert issued_key.startswith("sorai_")
+
+    status4, payload4 = handle_request(
+        config=cfg,
+        method="POST",
+        path="/api/v1/runs",
+        query={},
+        body={"profile": "general", "brief": "Write with key", "mode": "dry-run"},
+        headers={"x-api-key": issued_key},
+    )
+    assert status4 == 201
+    assert payload4["profile"] == "general"
+
+
+def test_signup_pending_requires_admin(tmp_path):
+    cfg = _config(tmp_path)
+    status, payload = handle_request(
+        config=cfg,
+        method="GET",
+        path="/api/v1/signup/pending",
+        query={},
+        body={"roles": ["operator"]},
+        headers={},
+    )
+    assert status == 403
+    assert "admin role" in payload["error"]
+
+
+def test_signup_duplicate_request_conflicts(tmp_path):
+    cfg = _config(tmp_path)
+    first_status, _ = handle_request(
+        config=cfg,
+        method="POST",
+        path="/api/v1/signup",
+        query={},
+        body={"email": "dup@example.com"},
+        headers={},
+    )
+    assert first_status == 201
+
+    second_status, payload = handle_request(
+        config=cfg,
+        method="POST",
+        path="/api/v1/signup",
+        query={},
+        body={"email": "dup@example.com"},
+        headers={},
+    )
+    assert second_status == 409
+    assert "already exists" in payload["error"]

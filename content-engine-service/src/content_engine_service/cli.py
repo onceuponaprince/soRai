@@ -12,6 +12,7 @@ from content_engine_service.run_pipeline import UnknownProfile, execute_pipeline
 from content_engine_service.run_types import DispatchResult, RunMode
 from content_engine_service.store import RunStore
 from content_engine_service.api_server import ApiConfig, serve
+from content_engine_service.api_auth import ApiKeyAuthenticator
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -56,6 +57,7 @@ def main(argv: list[str] | None = None) -> int:
     serve_parser.add_argument("--mock-output", default="")
     serve_parser.add_argument("--host", default="127.0.0.1")
     serve_parser.add_argument("--port", type=int, default=8000)
+    serve_parser.add_argument("--api-keys", default="", help="Optional JSON file: {api_key: [roles...]} for x-api-key auth.")
 
     args = parser.parse_args(argv)
 
@@ -76,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "serve":
             policy = _load_policy(args.allowlists)
+            authenticator = ApiKeyAuthenticator.from_json_file(args.api_keys) if args.api_keys else None
             config = ApiConfig(
                 engine_root=Path(args.engine_root),
                 artifact_root=Path(args.artifact_root),
@@ -86,6 +89,7 @@ def main(argv: list[str] | None = None) -> int:
                 default_tool=args.tool,
                 timeout=args.timeout,
                 mock_output=args.mock_output,
+                authenticator=authenticator,
             )
             serve(config=config, host=args.host, port=args.port)
             return 0

@@ -22,3 +22,19 @@ def test_store_records_run_artifact_and_approval(tmp_path):
     events = store.list_approval_events("run-2")
     assert events[0]["event_id"] == "event-1"
     assert events[0]["payload"] == {"profile": "build-in-public", "output": "draft"}
+
+
+
+def test_store_signup_lifecycle_and_api_key_roles(tmp_path):
+    store = RunStore(tmp_path / "runs.sqlite3")
+    store.init_schema()
+
+    signup = store.request_signup(email="person@example.com", requested_roles=("operator",))
+    assert signup["status"] == "pending"
+
+    approved = store.approve_signup(signup_id=signup["id"], approved_by="admin", approved_roles=("approver",), note="ok")
+    assert approved["status"] == "approved"
+    api_key = approved["api_key"]
+
+    roles = store.roles_for_api_key(api_key)
+    assert roles == ("approver",)
