@@ -57,6 +57,11 @@ document.getElementById("profilesBtn").addEventListener("click", async () => {
   setPre("profilesOut", out);
 });
 
+document.getElementById("profileMetaBtn").addEventListener("click", async () => {
+  const out = await request("/api/v1/profiles/meta", { method: "GET", headers: headers() });
+  setPre("profileMetaOut", out);
+});
+
 document.getElementById("signupForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(event.target);

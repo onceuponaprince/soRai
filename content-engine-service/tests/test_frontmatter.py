@@ -5,6 +5,7 @@ def test_parse_frontmatter_yaml_subset():
     parsed = parse_frontmatter_yaml(
         '''name: "general"
 summary: "Free-form"
+necessary: true
 content_types:
   - "essay"
   - "thread"
@@ -15,6 +16,7 @@ safety:
     )
 
     assert parsed["name"] == "general"
+    assert parsed["necessary"] is True
     assert parsed["content_types"] == ["essay", "thread"]
     assert parsed["safety"]["boundary_required"] is True
     assert parsed["safety"]["approval_required"] is False

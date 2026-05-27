@@ -79,6 +79,9 @@ def required_string_list(key: str) -> list[str]:
 name = required_string("name")
 summary = required_string("summary")
 sink = required_string("sink")
+necessary = cfg.get("necessary", True)
+if not isinstance(necessary, bool):
+    raise SystemExit(f"render.sh: profile {profile!r} field 'necessary' must be boolean")
 voice_mode = required_string("voice")
 graph_query = required_string("graph_query")
 type_noun = required_string("type_noun")
@@ -135,6 +138,7 @@ frontmatter = "\n".join(
     [
         f"name: {yaml_scalar(name)}",
         f"summary: {yaml_scalar(summary)}",
+        f"necessary: {'true' if necessary else 'false'}",
         f"description: {yaml_scalar(description)}",
         f"version: {yaml_scalar(version)}",
         f"profile: {yaml_scalar(profile)}",

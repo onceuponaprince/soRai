@@ -15,6 +15,7 @@ def test_render_bundle_includes_frontmatter_and_skill():
 
     assert bundle.profile.name == "general"
     assert bundle.profile.summary == "Free-form written-content generation with caller-supplied voice."
+    assert bundle.profile.necessary is True
     assert bundle.profile.sink == "workspace-files"
     assert "frontmatter.yaml" in bundle.rendered_files
     assert "SKILL.md" in bundle.rendered_files

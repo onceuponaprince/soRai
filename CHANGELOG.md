@@ -2,6 +2,13 @@
 
 All notable soRai rebuild checkpoints are tracked here.
 
+## 0.14.0 - 2026-05-27
+
+- Added `necessary` frontmatter status generation in `content-engine/lib/render.sh` and explicit necessity flags in profile TOMLs.
+- Added profile-metadata API endpoint `GET /api/v1/profiles/meta` returning profile `summary`, `necessary`, `sink`, `content_types`, and `safety`.
+- Added panel "Profile Metadata" view to inspect skill summary and necessity status from the API.
+- Added test coverage for frontmatter necessity parsing, profile metadata propagation, API metadata endpoint behavior, and panel metadata interaction.
+
 ## 0.13.0 - 2026-05-27
 
 - Added CORS and `OPTIONS` preflight support to the local WSGI API so the panel can call API endpoints from a different local port.

@@ -18,6 +18,7 @@ python3 -m http.server 8787
 
 - Health and role introspection (`whoami`)
 - Profile listing
+- Profile metadata summary (`summary`, `necessary`, `sink`)
 - Signup request
 - Pending signup admin approve/reject
 - Run creation

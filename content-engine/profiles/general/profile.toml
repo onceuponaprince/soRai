@@ -1,5 +1,6 @@
 name = "general"
 summary = "Free-form written-content generation with caller-supplied voice."
+necessary = true
 sink = "workspace-files"
 voice = "configurable"
 graph_query = "off"

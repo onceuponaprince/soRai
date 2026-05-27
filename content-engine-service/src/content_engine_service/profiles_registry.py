@@ -19,6 +19,7 @@ class RenderError(RuntimeError):
 class ProfileMeta:
     name: str
     summary: str
+    necessary: bool
     sink: str
     content_types: tuple[str, ...]
     safety: dict[str, Any]
@@ -88,6 +89,7 @@ def _profile_meta(data: dict[str, Any]) -> ProfileMeta:
     return ProfileMeta(
         name=str(data["name"]),
         summary=str(data["summary"]),
+        necessary=bool(data.get("necessary", True)),
         sink=str(data["sink"]),
         content_types=tuple(str(item) for item in data.get("content_types", [])),
         safety=dict(data.get("safety", {})),

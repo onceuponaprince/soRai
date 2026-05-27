@@ -32,6 +32,22 @@ def test_profiles_endpoint_filters_by_role(tmp_path):
     assert payload["profiles"] == ["build-in-public", "general"]
 
 
+def test_profiles_meta_endpoint_includes_necessity_status(tmp_path):
+    status, payload = handle_request(
+        config=_config(tmp_path),
+        method="GET",
+        path="/api/v1/profiles/meta",
+        query={"role": ["approver"]},
+        body={},
+        headers={},
+    )
+    assert status == 200
+    names = [item["name"] for item in payload["profiles"]]
+    assert names == ["build-in-public", "general"]
+    assert all(item["necessary"] is True for item in payload["profiles"])
+    assert all(item["summary"] for item in payload["profiles"])
+
+
 def test_runs_endpoint_creates_record_and_artifact(tmp_path):
     cfg = _config(tmp_path, mock_output="artifact output")
     status, payload = handle_request(

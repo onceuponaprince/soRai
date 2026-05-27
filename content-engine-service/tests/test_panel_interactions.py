@@ -106,6 +106,31 @@ def _mock_api_handler_factory():
                 return self._send_json(200, {"roles": ["admin"]})
             if self.path == "/api/v1/profiles":
                 return self._send_json(200, {"profiles": ["general", "build-in-public"], "roles": ["admin"]})
+            if self.path == "/api/v1/profiles/meta":
+                return self._send_json(
+                    200,
+                    {
+                        "profiles": [
+                            {
+                                "name": "general",
+                                "summary": "General writing profile",
+                                "necessary": True,
+                                "sink": "workspace-files",
+                                "content_types": ["essay", "thread"],
+                                "safety": {"boundary_required": True, "approval_required": False},
+                            },
+                            {
+                                "name": "build-in-public",
+                                "summary": "Build-in-public profile",
+                                "necessary": True,
+                                "sink": "borai-inbox",
+                                "content_types": ["launch", "recap"],
+                                "safety": {"boundary_required": True, "approval_required": True},
+                            },
+                        ],
+                        "roles": ["admin"],
+                    },
+                )
             if self.path == "/api/v1/signup/pending":
                 return self._send_json(200, {"pending": state["pending"]})
             if self.path == "/api/v1/approvals":
@@ -234,6 +259,9 @@ def test_panel_clicks_render_core_responses(browser_page, panel_and_api_urls):
 
     page.click("#profilesBtn")
     _wait_text(page, "#profilesOut", '"general"')
+
+    page.click("#profileMetaBtn")
+    _wait_text(page, "#profileMetaOut", '"necessary": true')
 
 
 def test_panel_forms_and_admin_actions(browser_page, panel_and_api_urls):

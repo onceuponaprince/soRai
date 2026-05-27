@@ -1,5 +1,6 @@
 name = "build-in-public"
 summary = "Build-in-public drafts in a fixed voice, staged for approval."
+necessary = true
 sink = "borai-inbox"
 voice = "fixed:voice-profile.md"
 graph_query = "on"

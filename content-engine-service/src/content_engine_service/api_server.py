@@ -82,6 +82,16 @@ def handle_request(*, config: ApiConfig, method: str, path: str, query: dict[str
             allowed = config.policy.allowed_profiles(actor, names)
             return 200, {"profiles": list(allowed), "roles": list(actor.roles)}
 
+        if method == "GET" and path == "/api/v1/profiles/meta":
+            names = profiles_registry.list_profile_names(config.engine_root)
+            allowed = config.policy.allowed_profiles(actor, names)
+            cache: dict[tuple[str, str, str], profiles_registry.RenderedBundle] = {}
+            items = []
+            for profile in allowed:
+                bundle = profiles_registry.render_bundle(config.engine_root, profile, cache=cache)
+                items.append(_profile_meta_view(bundle.profile))
+            return 200, {"profiles": items, "roles": list(actor.roles)}
+
         if method == "POST" and path == "/api/v1/signup":
             store = _require_store(config)
             email = str(body.get("email", "")).strip()
@@ -333,6 +343,17 @@ def _issued_key_view(row: dict[str, Any]) -> dict[str, Any]:
         "roles": list(row.get("roles", ())),
         "is_active": bool(row.get("is_active")),
         "created_at": row.get("created_at"),
+    }
+
+
+def _profile_meta_view(meta: profiles_registry.ProfileMeta) -> dict[str, Any]:
+    return {
+        "name": meta.name,
+        "summary": meta.summary,
+        "necessary": meta.necessary,
+        "sink": meta.sink,
+        "content_types": list(meta.content_types),
+        "safety": dict(meta.safety),
     }
 
 
